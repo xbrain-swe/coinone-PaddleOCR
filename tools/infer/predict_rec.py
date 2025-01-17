@@ -16,6 +16,9 @@ import sys
 from PIL import Image
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
+
+from tools.infer.utility import triton_client
+
 sys.path.append(__dir__)
 sys.path.insert(0, os.path.abspath(os.path.join(__dir__, "../..")))
 
@@ -154,6 +157,8 @@ class TextRecognizer(object):
         ) = utility.create_predictor(args, "rec", logger)
         self.benchmark = args.benchmark
         self.use_onnx = args.use_onnx
+        self.use_triton = args.use_triton
+
         if args.benchmark:
             import auto_log
 
@@ -205,7 +210,7 @@ class TextRecognizer(object):
 
         assert imgC == img.shape[2]
         imgW = int((imgH * max_wh_ratio))
-        if self.use_onnx:
+        if self.use_onnx or self.use_triton:
             w = self.input_tensor.shape[3:][0]
             if isinstance(w, str):
                 pass
@@ -674,6 +679,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = {"predict": outputs[2]}
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = {"predict": outputs[2]}
                 else:
                     input_names = self.predictor.get_input_names()
                     for i in range(len(input_names)):
@@ -698,6 +715,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs[0]
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = outputs[0]
                 else:
                     input_names = self.predictor.get_input_names()
                     for i in range(len(input_names)):
@@ -721,6 +750,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs[0]
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = outputs[0]
                 else:
                     input_names = self.predictor.get_input_names()
                     for i in range(len(input_names)):
@@ -743,6 +784,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = outputs
                 else:
                     input_names = self.predictor.get_input_names()
                     input_tensor = []
@@ -766,6 +819,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = outputs
                 else:
                     input_names = self.predictor.get_input_names()
                     input_tensor = []
@@ -788,6 +853,18 @@ class TextRecognizer(object):
                     input_dict[self.input_tensor.name] = norm_img_batch
                     outputs = self.predictor.run(self.output_tensors, input_dict)
                     preds = outputs[0]
+                elif self.use_triton:
+                    from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                    with triton_client() as client:
+                        input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                        input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                        output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                        results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                        outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
+                        preds = outputs[0]
                 else:
                     self.input_tensor.copy_from_cpu(norm_img_batch)
                     self.predictor.run()
@@ -801,6 +878,7 @@ class TextRecognizer(object):
                         preds = outputs
                     else:
                         preds = outputs[0]
+
             if self.postprocess_params["name"] == "CTCLabelDecode":
                 rec_result = self.postprocess_op(
                     preds,

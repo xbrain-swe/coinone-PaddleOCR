@@ -667,7 +667,7 @@ class PaddleOCR(predict_system.TextSystem):
         if kwargs.get("rec_image_shape") is not None:
             params.rec_image_shape = kwargs.get("rec_image_shape")
         # download model if using paddle infer
-        if not params.use_onnx:
+        if not params.use_onnx and not params.use_triton:
             maybe_download(params.det_model_dir, det_url)
             maybe_download(params.rec_model_dir, rec_url)
             maybe_download(params.cls_model_dir, cls_url)

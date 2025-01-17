@@ -153,6 +153,7 @@ def init_args():
 
     parser.add_argument("--show_log", type=str2bool, default=True)
     parser.add_argument("--use_onnx", type=str2bool, default=False)
+    parser.add_argument("--use_triton", type=str2bool, default=False)
     parser.add_argument("--onnx_providers", nargs="+", type=str, default=False)
     parser.add_argument("--onnx_sess_options", type=list, default=False)
 
@@ -195,6 +196,13 @@ def create_predictor(args, mode, logger):
     if model_dir is None:
         logger.info("not find {} model file path {}".format(mode, model_dir))
         sys.exit(0)
+
+    if args.use_triton:
+        model_name = f"ppocr_{mode}"
+        input_tensor = get_triton_input_tensor(model_name)
+        output_tensor = get_triton_output_tensors(model_name)
+        return model_name, input_tensor, output_tensor, None
+
     if args.use_onnx:
         import onnxruntime as ort
 
@@ -391,6 +399,54 @@ def get_output_tensors(args, mode, predictor):
             output_tensors.append(output_tensor)
     return output_tensors
 
+
+def triton_client():
+    from tritonclient.grpc import InferenceServerClient
+
+    class TritonClientManager:
+        def __init__(self):
+            self.client = InferenceServerClient(
+                url="localhost:8001",
+                verbose=False,
+                ssl=False,
+            )
+
+        def __enter__(self):
+            return self.client
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.client.close()
+
+    return TritonClientManager()
+
+
+class _TritonTensor:
+    def __init__(self, name, dims, datatype):
+        self.name = name
+        self.shape = dims
+        self.dtype = datatype
+
+
+def get_triton_input_tensor(model_name):
+    with triton_client() as tc:
+        model_info = tc.get_model_config(model_name)
+        return _TritonTensor(
+            model_info.config.input[0].name,
+            model_info.config.input[0].dims,
+            'FP32'
+        )
+
+def get_triton_output_tensors(model_name):
+    with triton_client() as tc:
+        model_info = tc.get_model_config(model_name)
+        return [
+            _TritonTensor(
+                output.name,
+                output.dims,
+                output.data_type
+            )
+            for output in model_info.config.output
+        ]
 
 def get_infer_gpuid():
     """

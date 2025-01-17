@@ -15,6 +15,9 @@ import os
 import sys
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
+
+from tools.infer.utility import triton_client
+
 sys.path.append(__dir__)
 sys.path.insert(0, os.path.abspath(os.path.join(__dir__, "../..")))
 
@@ -40,6 +43,8 @@ class TextDetector(object):
         self.args = args
         self.det_algorithm = args.det_algorithm
         self.use_onnx = args.use_onnx
+        self.use_triton = args.use_triton
+
         pre_process_list = [
             {
                 "DetResizeForTest": {
@@ -138,7 +143,7 @@ class TextDetector(object):
             self.config,
         ) = utility.create_predictor(args, "det", logger)
 
-        if self.use_onnx:
+        if self.use_onnx or self.use_triton:
             img_h, img_w = self.input_tensor.shape[2:]
             if isinstance(img_h, str) or isinstance(img_w, str):
                 pass
@@ -250,6 +255,17 @@ class TextDetector(object):
             input_dict = {}
             input_dict[self.input_tensor.name] = img
             outputs = self.predictor.run(self.output_tensors, input_dict)
+        elif self.use_triton:
+            from tritonclient.grpc import InferInput, InferRequestedOutput
+
+            with triton_client() as client:
+                input_tensors = [InferInput(self.input_tensor.name, img.shape, self.input_tensor.dtype)]
+                input_tensors[0].set_data_from_numpy(img)
+
+                output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                outputs = [results.as_numpy(ot.name).copy() for ot in self.output_tensors]
         else:
             self.input_tensor.copy_from_cpu(img)
             self.predictor.run()

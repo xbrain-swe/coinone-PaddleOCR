@@ -15,6 +15,9 @@ import os
 import sys
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
+
+from tools.infer.utility import triton_client
+
 sys.path.append(__dir__)
 sys.path.insert(0, os.path.abspath(os.path.join(__dir__, "../..")))
 
@@ -52,6 +55,7 @@ class TextClassifier(object):
             _,
         ) = utility.create_predictor(args, "cls", logger)
         self.use_onnx = args.use_onnx
+        self.use_triton = args.use_triton
 
     def resize_norm_img(self, img):
         imgC, imgH, imgW = self.cls_image_shape
@@ -109,11 +113,23 @@ class TextClassifier(object):
                 input_dict[self.input_tensor.name] = norm_img_batch
                 outputs = self.predictor.run(self.output_tensors, input_dict)
                 prob_out = outputs[0]
+            elif self.use_triton:
+                from tritonclient.grpc import InferInput, InferRequestedOutput
+
+                with triton_client() as client:
+                    input_tensors = [InferInput(self.input_tensor.name, norm_img_batch.shape, self.input_tensor.dtype)]
+                    input_tensors[0].set_data_from_numpy(norm_img_batch)
+
+                    output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
+
+                    results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
+                    prob_out = results.as_numpy(self.output_tensors[0].name).copy()[0]
             else:
                 self.input_tensor.copy_from_cpu(norm_img_batch)
                 self.predictor.run()
                 prob_out = self.output_tensors[0].copy_to_cpu()
                 self.predictor.try_shrink_memory()
+
             cls_result = self.postprocess_op(prob_out)
             elapse += time.time() - starttime
             for rno in range(len(cls_result)):
