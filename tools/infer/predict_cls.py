@@ -23,17 +23,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(__dir__, "../..")))
 
 os.environ["FLAGS_allocator_strategy"] = "auto_growth"
 
-import cv2
 import copy
-import numpy as np
 import math
 import time
 import traceback
 
+import cv2
+import numpy as np
 import tools.infer.utility as utility
 from ppocr.postprocess import build_post_process
 from ppocr.utils.logging import get_logger
-from ppocr.utils.utility import get_image_file_list, check_and_read
+from ppocr.utils.utility import check_and_read, get_image_file_list
 
 logger = get_logger()
 
@@ -123,7 +123,7 @@ class TextClassifier(object):
                     output_tensors = [InferRequestedOutput(ot.name) for ot in self.output_tensors]
 
                     results = client.infer(model_name=self.predictor, inputs=input_tensors, outputs=output_tensors)
-                    prob_out = results.as_numpy(self.output_tensors[0].name).copy()[0]
+                    prob_out = results.as_numpy(self.output_tensors[0].name).copy()
             else:
                 self.input_tensor.copy_from_cpu(norm_img_batch)
                 self.predictor.run()
